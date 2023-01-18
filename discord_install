@@ -1,0 +1,168 @@
+#!/bin/python3
+
+import subprocess
+from os import symlink, unlink, sep, getuid, environ
+from os.path import join, islink, expanduser, abspath, exists
+from tar import extract
+from request import request
+from shutil import rmtree
+from sys import argv
+
+DEFAULT_VERSION = "0.0.24"
+
+NAME = "discord"
+APP = "Discord"
+SUMMARY = "All-in-one voice and text chat for gamers"
+
+VERSION = environ.get("DISCORD_VERSION", DEFAULT_VERSION)
+FILENAME = f"{NAME}-{VERSION}.tar.gz"
+SOURCE = f"https://dl.discordapp.net/apps/linux/{VERSION}/{FILENAME}"
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0"
+}
+
+USR_DIR = join(abspath(sep), "usr")
+
+ICON = "discord.png"
+SHORTCUT = "discord.desktop"
+
+LOCAL_DIR = join(expanduser("~"), ".local")
+
+LOCAL_LIB_DIR = lambda LOCAL_DIR=LOCAL_DIR: join(LOCAL_DIR, "lib", NAME, VERSION)
+LOCAL_SHARE_SHORTCUT = lambda LOCAL_DIR=LOCAL_DIR: join(
+    LOCAL_DIR, "share", "applications", SHORTCUT
+)
+
+USR_ICON = join(USR_DIR, "share", "icons", ICON)
+USR_APP = join(USR_DIR, "bin", APP)
+USR_SHORTCUT = join(USR_DIR, "share", "applications", SHORTCUT)
+
+DESKTOP_SHORTCUT_TEMPLATE = f"""
+[Desktop Entry]
+Name={APP}
+Comment={SUMMARY}
+Exec={APP}
+Type=Application
+Terminal=false
+Icon={USR_ICON}
+Categories=Network;
+"""
+
+DEFAULT_OPEN_MODE = "w+"
+BASE_COMMAND = ["/usr/bin/sudo", argv[0]]
+
+
+class NotSudo(Exception):
+    pass
+
+
+def _require_sudo():
+    if getuid() != 0:
+        raise NotSudo(
+            "This program is not run as sudo or elevated this it will not work"
+        )
+
+
+def _run_command(
+    command,
+    *arguments,
+) -> subprocess.Popen:
+    return subprocess.Popen(
+        [command, *arguments],
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+
+def _live_view(process: subprocess.Popen):
+    while process.stdout.readable():
+        line: str = process.stdout.readline()
+
+        if not line:
+            return process.stdout.read()
+
+        print(line.strip())
+
+
+def remove(file: str):
+    print(f"remove {file}")
+
+    if islink(file):
+        unlink(file)
+    elif exists(file):
+        rmtree(file)
+
+
+def uninstall(LOCAL_DIR: str = LOCAL_DIR):
+
+    print(f"uninstall {NAME} {VERSION}")
+    for path in [
+        LOCAL_LIB_DIR(LOCAL_DIR),
+        USR_ICON,
+        LOCAL_SHARE_SHORTCUT(LOCAL_DIR),
+        USR_SHORTCUT,
+        USR_APP,
+    ]:
+        remove(path)
+
+
+def create_links(work_dir: str, LOCAL_DIR: str = LOCAL_DIR):
+    print(f"start create files {NAME} {VERSION}")
+    print(f"base work dir {work_dir}")
+
+    local_share_shortcut = LOCAL_SHARE_SHORTCUT(LOCAL_DIR)
+
+    symlink(join(work_dir, ICON), USR_ICON, False)
+    print(f"created {ICON} on {USR_ICON}")
+
+    symlink(join(work_dir, APP), USR_APP, False)
+    print(f"created {APP} on {USR_APP}")
+
+    with open(local_share_shortcut, DEFAULT_OPEN_MODE) as shortcut:
+        shortcut.write(DESKTOP_SHORTCUT_TEMPLATE)
+    print(f"created {SHORTCUT} on {local_share_shortcut}")
+    print(DESKTOP_SHORTCUT_TEMPLATE)
+
+    symlink(
+        local_share_shortcut,
+        USR_SHORTCUT,
+        False,
+    )
+    print(f"created {SHORTCUT} on {USR_SHORTCUT}")
+
+
+def install(LOCAL_DIR: str = LOCAL_DIR):
+    local_lib_dir = LOCAL_LIB_DIR(LOCAL_DIR)
+    print(f"Start install {NAME} {VERSION} on {local_lib_dir}")
+
+    _live_view(_run_command(*BASE_COMMAND, "uninstall", LOCAL_DIR))
+
+    print(f"download {SOURCE}")
+    response = request(SOURCE, headers=HEADERS)
+
+    if response.status > 299:
+        print(response.body)
+        return
+
+    work_dir = extract(file=response.get_raw(), path=local_lib_dir)
+    print(f"download finish on folder {work_dir}")
+
+    _live_view(_run_command(*BASE_COMMAND, "create_links", work_dir, LOCAL_DIR))
+
+
+if __name__ == "__main__":
+    if len(argv) == 1:
+        install()
+        exit(0)
+
+    command = argv[1]
+    if command == "uninstall":
+        _require_sudo()
+        uninstall(argv[2])
+        exit(0)
+
+    if command == "create_links":
+        _require_sudo()
+        create_links(argv[2], argv[3])
+        exit(0)
