@@ -5,6 +5,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from typing import NamedTuple
 
+
 DEFAULT_CHARSET = "utf-8"
 DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_TIMEOUT = 10
@@ -69,10 +70,14 @@ def request(
         else:
             request_data = urlencode(data).encode()
 
-    req = Request(url, data=request_data, headers=headers, method=method)
+    req = Request(
+        url, data=request_data, headers=headers, method=method, unverifiable=True
+    )
 
     try:
-        with urlopen(req, timeout=timeout) as res:
+        with urlopen(
+            req, timeout=timeout, cadefault=False
+        ) as res:
             body = res.read()
             headers = dict(res.headers)
             status = res.status

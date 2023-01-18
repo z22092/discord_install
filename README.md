@@ -3,12 +3,12 @@
 ### This script is a command line tool for installing the Discord app on Linux systems. It includes options for specifying the version of Discord to install, as well as options for uninstalling the app.
 
 ## Requirements
-- Python 3
+- Python ^3.6
 - Sudo permission
 
 ## Usage
 
-To use this script, first make sure it has execute permissions. If it does not, run chmod +x <script-name>.
+To use this script, download latest bin and make sure it has execute permissions. If it does not, run chmod +x <script-name>.
 
 ### Installation
 

@@ -1,12 +1,11 @@
 from os.path import join
 from tarfile import open
-from typing import IO
 
 DEFAULT_MODE = "r:gz"
 
 
 def extract(
-    file: IO, path: str = None, includes: list[str] = [], excludes: list[str] = []
+    file, path: str = None, includes: list = [], excludes: list = []
 ):
     with open(mode=DEFAULT_MODE, fileobj=file) as tar:
         files = tar.getmembers()
