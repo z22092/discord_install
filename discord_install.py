@@ -15,7 +15,7 @@ from pathlib import Path
 from tar import extract
 from request import request
 
-DEFAULT_VERSION = "0.0.24"
+DEFAULT_VERSION = "0.0.25"
 
 NAME = "discord"
 APP = "Discord"
